@@ -1,0 +1,380 @@
+import pandas as pd
+import numpy as np
+import re
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+encountering a UnicodeDecodeError while trying to read a CSV file using pandas. This error typically occurs when there are characters in the file that are not encoded in UTF-8 format, which is the default encoding used by pandas.
+
+To address this issue, you can try specifying a different encoding when reading the CSV file. Common encodings to try include 'latin1', 'ISO-8859-1', 'utf-16', or 'utf-32'. You can specify the encoding using the encoding parameter in the read_csv function. For example:
+
+data = pd.read_csv('twitter.csv', encoding='latin1')
+import nltk
+nltk.download("stopwords")
+[nltk_data] Downloading package stopwords to
+[nltk_data]     C:\Users\SUSI\AppData\Roaming\nltk_data...
+[nltk_data]   Package stopwords is already up-to-date!
+True
+#printing the stopwords in english
+print(stopwords.words('english'))
+['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', "you're", "you've", "you'll", "you'd", 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', "she's", 'her', 'hers', 'herself', 'it', "it's", 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that', "that'll", 'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', "don't", 'should', "should've", 'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', "aren't", 'couldn', "couldn't", 'didn', "didn't", 'doesn', "doesn't", 'hadn', "hadn't", 'hasn', "hasn't", 'haven', "haven't", 'isn', "isn't", 'ma', 'mightn', "mightn't", 'mustn', "mustn't", 'needn', "needn't", 'shan', "shan't", 'shouldn', "shouldn't", 'wasn', "wasn't", 'weren', "weren't", 'won', "won't", 'wouldn', "wouldn't"]
+data processing
+#loading the data to pandas dataframe
+data=pd.read_csv('twitter.csv',encoding='ISO-8859-1')
+#checking number of rows and columns(starts from 0)
+data.shape
+(1599999, 6)
+#printing first 5 rows of the data
+data.head()
+0	1467810369	Mon Apr 06 22:19:45 PDT 2009	NO_QUERY	_TheSpecialOne_	@switchfoot http://twitpic.com/2y1zl - Awww, that's a bummer. You shoulda got David Carr of Third Day to do it. ;D
+0	0	1467810672	Mon Apr 06 22:19:49 PDT 2009	NO_QUERY	scotthamilton	is upset that he can't update his Facebook by ...
+1	0	1467810917	Mon Apr 06 22:19:53 PDT 2009	NO_QUERY	mattycus	@Kenichan I dived many times for the ball. Man...
+2	0	1467811184	Mon Apr 06 22:19:57 PDT 2009	NO_QUERY	ElleCTF	my whole body feels itchy and like its on fire
+3	0	1467811193	Mon Apr 06 22:19:57 PDT 2009	NO_QUERY	Karoli	@nationwideclass no, it's not behaving at all....
+4	0	1467811372	Mon Apr 06 22:20:00 PDT 2009	NO_QUERY	joy_wolf	@Kwesidei not the whole crew
+here column names are not being read by pd.read_csv, the first column is being read as the column name which is wrong
+#naming the coulmns and reading the data again
+columns=['target','id','date','flag','user','text']
+data=pd.read_csv('twitter.csv',names=columns,encoding='ISO-8859-1')
+data.head()
+target	id	date	flag	user	text
+0	0	1467810369	Mon Apr 06 22:19:45 PDT 2009	NO_QUERY	_TheSpecialOne_	@switchfoot http://twitpic.com/2y1zl - Awww, t...
+1	0	1467810672	Mon Apr 06 22:19:49 PDT 2009	NO_QUERY	scotthamilton	is upset that he can't update his Facebook by ...
+2	0	1467810917	Mon Apr 06 22:19:53 PDT 2009	NO_QUERY	mattycus	@Kenichan I dived many times for the ball. Man...
+3	0	1467811184	Mon Apr 06 22:19:57 PDT 2009	NO_QUERY	ElleCTF	my whole body feels itchy and like its on fire
+4	0	1467811193	Mon Apr 06 22:19:57 PDT 2009	NO_QUERY	Karoli	@nationwideclass no, it's not behaving at all....
+target 0=negative 4=positive
+#counting the number of missing values in the data
+data.isna().sum()
+target    0
+id        0
+date      0
+flag      0
+user      0
+text      0
+dtype: int64
+#checking the distribution of target column(to see how many number of negative,positive and nuetral tweets are there)
+data['target'].value_counts()
+target
+0    800000
+4    800000
+Name: count, dtype: int64
+always we should work with dataset that has equal distribution or else the ml model might be biased
+
+convert the target '4' to '1'
+data.replace({'target':{4:1}},inplace=True)
+#checking the distribution of target column(to see how many number of negative,positive and nuetral tweets are there)
+data['target'].value_counts()
+target
+0    800000
+1    800000
+Name: count, dtype: int64
+stemming
+
+stemming is the process of reducing a word to its root word
+
+swimming-swim,eating-eat
+
+# Compile a regular expression pattern to match any character that is not an alphabet
+pattern = re.compile('[^a-zA-Z]')
+
+# Get a set of English stopwords from NLTK
+english_stopwords = set(stopwords.words('english'))
+
+# Create an instance of the PorterStemmer class for stemming
+port_stemmer = PorterStemmer()
+
+# Define the stemming function that takes a text input
+def stemming(text1):
+    # Remove all characters that are not alphabets using the compiled pattern
+    cleaned_text = re.sub(pattern, ' ', text1)
+    
+    # Convert the cleaned text to lowercase
+    cleaned_text = cleaned_text.lower()
+    
+    # Split the lowercase text into individual words
+    words = cleaned_text.split()
+    
+    # Apply stemming using the PorterStemmer and filter out stopwords
+    stemmed_words = [port_stemmer.stem(word) for word in words if word not in english_stopwords]
+    
+    # Join the stemmed words back into a single string
+    stemmed_text = ' '.join(stemmed_words)
+    
+    # Return the stemmed text
+    return stemmed_text
+data['stemmed_text'] = data['text'].apply(stemming)
+data.head()
+target	id	date	flag	user	text	stemmed_text
+0	0	1467810369	Mon Apr 06 22:19:45 PDT 2009	NO_QUERY	_TheSpecialOne_	@switchfoot http://twitpic.com/2y1zl - Awww, t...	switchfoot http twitpic com zl awww bummer sho...
+1	0	1467810672	Mon Apr 06 22:19:49 PDT 2009	NO_QUERY	scotthamilton	is upset that he can't update his Facebook by ...	upset updat facebook text might cri result sch...
+2	0	1467810917	Mon Apr 06 22:19:53 PDT 2009	NO_QUERY	mattycus	@Kenichan I dived many times for the ball. Man...	kenichan dive mani time ball manag save rest g...
+3	0	1467811184	Mon Apr 06 22:19:57 PDT 2009	NO_QUERY	ElleCTF	my whole body feels itchy and like its on fire	whole bodi feel itchi like fire
+4	0	1467811193	Mon Apr 06 22:19:57 PDT 2009	NO_QUERY	Karoli	@nationwideclass no, it's not behaving at all....	nationwideclass behav mad see
+print(data['stemmed_text'])
+0          switchfoot http twitpic com zl awww bummer sho...
+1          upset updat facebook text might cri result sch...
+2          kenichan dive mani time ball manag save rest g...
+3                            whole bodi feel itchi like fire
+4                              nationwideclass behav mad see
+                                 ...                        
+1599995                           woke school best feel ever
+1599996    thewdb com cool hear old walt interview http b...
+1599997                         readi mojo makeov ask detail
+1599998    happi th birthday boo alll time tupac amaru sh...
+1599999    happi charitytuesday thenspcc sparkschar speak...
+Name: stemmed_text, Length: 1600000, dtype: object
+print(data['target'])
+0          0
+1          0
+2          0
+3          0
+4          0
+          ..
+1599995    1
+1599996    1
+1599997    1
+1599998    1
+1599999    1
+Name: target, Length: 1600000, dtype: int64
+#seperating the data and label
+x=data['stemmed_text'].values
+y=data['target'].values
+print(x)
+['switchfoot http twitpic com zl awww bummer shoulda got david carr third day'
+ 'upset updat facebook text might cri result school today also blah'
+ 'kenichan dive mani time ball manag save rest go bound' ...
+ 'readi mojo makeov ask detail'
+ 'happi th birthday boo alll time tupac amaru shakur'
+ 'happi charitytuesday thenspcc sparkschar speakinguph h']
+print(y)
+[0 0 0 ... 1 1 1]
+splitting the data to training and test data
+from sklearn.model_selection import train_test_split
+X_train,X_test,Y_train,Y_test=train_test_split(x,y,test_size=0.2,stratify=y,random_state=2)
+print(x.shape,X_train.shape,X_test.shape)
+(1600000,) (1280000,) (320000,)
+print(X_train)
+['watch saw iv drink lil wine' 'hatermagazin'
+ 'even though favourit drink think vodka coke wipe mind time think im gonna find new drink'
+ ... 'eager monday afternoon'
+ 'hope everyon mother great day wait hear guy store tomorrow'
+ 'love wake folger bad voic deeper']
+print(X_test)
+['mmangen fine much time chat twitter hubbi back summer amp tend domin free time'
+ 'ah may show w ruth kim amp geoffrey sanhueza'
+ 'ishatara mayb bay area thang dammit' ...
+ 'destini nevertheless hooray member wonder safe trip' 'feel well'
+ 'supersandro thank']
+as we know ml model cannot understand text it should only be in numbers so conerting the text to numericals
+error is occurring because the TfidfVectorizer is attempting to apply lowercase transformation (lower()) directly to the input data (X_test), which is a CSR matrix. This operation is not supported on CSR matrices, hence the AttributeError.
+
+To resolve this issue, ensure that your TfidfVectorizer is configured not to perform lowercase transformation during the transformation process. You can achieve this by setting the lowercase parameter of TfidfVectorizer to False when creating the vectorizer instance.
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Concatenate the lists of strings into a single list for training data
+X_train_texts_concatenated = X_train
+
+# Concatenate the lists of strings into a single list for test data
+X_test_texts_concatenated = X_test
+
+# Initialize TfidfVectorizer
+tfidf_vectorizer = TfidfVectorizer(lowercase=False)
+
+# Fit and transform on training data
+X_train_tfidf = tfidf_vectorizer.fit_transform(X_train_texts_concatenated)
+
+# Transform test data
+X_test_tfidf = tfidf_vectorizer.transform(X_test_texts_concatenated)
+print(X_train_tfidf)
+  (0, 443066)	0.4484755317023172
+  (0, 235045)	0.41996827700291095
+  (0, 109306)	0.3753708587402299
+  (0, 185193)	0.5277679060576009
+  (0, 354543)	0.3588091611460021
+  (0, 436713)	0.27259876264838384
+  (1, 160636)	1.0
+  (2, 288470)	0.16786949597862733
+  (2, 132311)	0.2028971570399794
+  (2, 150715)	0.18803850583207948
+  (2, 178061)	0.1619010109445149
+  (2, 409143)	0.15169282335109835
+  (2, 266729)	0.24123230668976975
+  (2, 443430)	0.3348599670252845
+  (2, 77929)	0.31284080750346344
+  (2, 433560)	0.3296595898028565
+  (2, 406399)	0.32105459490875526
+  (2, 129411)	0.29074192727957143
+  (2, 407301)	0.18709338684973031
+  (2, 124484)	0.1892155960801415
+  (2, 109306)	0.4591176413728317
+  (3, 172421)	0.37464146922154384
+  (3, 411528)	0.27089772444087873
+  (3, 388626)	0.3940776331458846
+  (3, 56476)	0.5200465453608686
+  :	:
+  (1279996, 390130)	0.22064742191076112
+  (1279996, 434014)	0.2718945052332447
+  (1279996, 318303)	0.21254698865277746
+  (1279996, 237899)	0.2236567560099234
+  (1279996, 291078)	0.17981734369155505
+  (1279996, 412553)	0.18967045002348676
+  (1279997, 112591)	0.7574829183045267
+  (1279997, 273084)	0.4353549002982409
+  (1279997, 5685)	0.48650358607431304
+  (1279998, 385313)	0.4103285865588191
+  (1279998, 275288)	0.38703346602729577
+  (1279998, 162047)	0.34691726958159064
+  (1279998, 156297)	0.3137096161546449
+  (1279998, 153281)	0.28378968751027456
+  (1279998, 435463)	0.2851807874350361
+  (1279998, 124765)	0.32241752985927996
+  (1279998, 169461)	0.2659980990397061
+  (1279998, 93795)	0.21717768937055476
+  (1279998, 412553)	0.2816582375021589
+  (1279999, 96224)	0.5416162421321443
+  (1279999, 135384)	0.6130934129868719
+  (1279999, 433612)	0.3607341026233411
+  (1279999, 435572)	0.31691096877786484
+  (1279999, 31410)	0.248792678366695
+  (1279999, 242268)	0.19572649660865402
+print(X_test_tfidf)
+  (0, 420984)	0.17915624523539803
+  (0, 409143)	0.31430470598079707
+  (0, 398906)	0.3491043873264267
+  (0, 388348)	0.21985076072061738
+  (0, 279082)	0.1782518010910344
+  (0, 271016)	0.4535662391658828
+  (0, 171378)	0.2805816206356073
+  (0, 138164)	0.23688292264071403
+  (0, 132364)	0.25525488955578596
+  (0, 106069)	0.3655545001090455
+  (0, 67828)	0.26800375270827315
+  (0, 31168)	0.16247724180521766
+  (0, 15110)	0.1719352837797837
+  (1, 366203)	0.24595562404108307
+  (1, 348135)	0.4739279595416274
+  (1, 256777)	0.28751585696559306
+  (1, 217562)	0.40288153995289894
+  (1, 145393)	0.575262969264869
+  (1, 15110)	0.211037449588008
+  (1, 6463)	0.30733520460524466
+  (2, 400621)	0.4317732461913093
+  (2, 256834)	0.2564939661498776
+  (2, 183312)	0.5892069252021465
+  (2, 89448)	0.36340369428387626
+  (2, 34401)	0.37916255084357414
+  :	:
+  (319994, 123278)	0.4530341382559843
+  (319995, 444934)	0.3211092817599261
+  (319995, 420984)	0.22631428606830145
+  (319995, 416257)	0.23816465111736276
+  (319995, 324496)	0.3613167933647574
+  (319995, 315813)	0.28482299145634127
+  (319995, 296662)	0.39924856793840147
+  (319995, 232891)	0.25741278545890767
+  (319995, 213324)	0.2683969144317078
+  (319995, 155493)	0.2770682832971668
+  (319995, 109379)	0.30208964848908326
+  (319995, 107868)	0.3339934973754696
+  (319996, 438709)	0.4143006291901984
+  (319996, 397506)	0.9101400928717545
+  (319997, 444770)	0.2668297951055569
+  (319997, 416695)	0.29458327588067873
+  (319997, 349904)	0.32484594100566083
+  (319997, 288421)	0.48498483387153407
+  (319997, 261286)	0.37323893626855326
+  (319997, 169411)	0.403381646999604
+  (319997, 98792)	0.4463892055808332
+  (319998, 438748)	0.719789181620468
+  (319998, 130192)	0.6941927210956169
+  (319999, 400636)	0.2874420848216212
+  (319999, 389755)	0.9577980203954275
+training the machine learning model
+LOGISTIC REGRESSION(CLASSIFICATION MODEL BECAUSE WE HAVE TARGET AS 0 OR 1)
+
+model=LogisticRegression(max_iter=1000)#max no. of times the model can go through the data
+model.fit(X_train_tfidf,Y_train)
+LogisticRegression(max_iter=1000)
+In a Jupyter environment, please rerun this cell to show the HTML representation or trust the notebook.
+On GitHub, the HTML representation is unable to render, please try loading this page with nbviewer.org.
+model evaluation
+
+#accuracy score on the training data
+X_train_pred=model.predict(X_train_tfidf)
+training_data_accuracy=accuracy_score(Y_train,X_train_pred)
+print("accuracy score:", training_data_accuracy)
+accuracy score: 0.79871953125
+#accuracy score on the training data
+X_test_pred=model.predict(X_test_tfidf)
+test_data_accuracy=accuracy_score(Y_test,X_test_pred)
+print("accuracy score:", test_data_accuracy)
+accuracy score: 0.77668125
+from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.model_selection import cross_val_score
+
+# Calculate precision, recall, and F1-score for the training set
+train_precision = precision_score(Y_train, X_train_pred)
+train_recall = recall_score(Y_train, X_train_pred)
+train_f1 = f1_score(Y_train, X_train_pred)
+
+print("Training Precision:", train_precision)
+print("Training Recall:", train_recall)
+print("Training F1-score:", train_f1)
+
+# Calculate precision, recall, and F1-score for the test set
+test_precision = precision_score(Y_test, X_test_pred)
+test_recall = recall_score(Y_test, X_test_pred)
+test_f1 = f1_score(Y_test, X_test_pred)
+
+print("Test Precision:", test_precision)
+print("Test Recall:", test_recall)
+print("Test F1-score:", test_f1)
+
+# Perform cross-validation
+cv_scores = cross_val_score(model, X_train_tfidf, Y_train, cv=5, scoring='accuracy')  # 5-fold cross-validation
+print("Cross-validation scores:", cv_scores)
+print("Mean cross-validation score:", cv_scores.mean())
+Training Precision: 0.7856002175085413
+Training Recall: 0.8216875
+Training F1-score: 0.8032387377720618
+Test Precision: 0.7666068438866338
+Test Recall: 0.795575
+Test F1-score: 0.7808223379523135
+Cross-validation scores: [0.7768125  0.77683984 0.77802734 0.77530078 0.77342578]
+Mean cross-validation score: 0.7760812500000001
+comparsion to baseline
+
+# Calculate baseline accuracy (for a majority class baseline)
+baseline_accuracy = max(sum(Y_test == 1) / len(Y_test), sum(Y_test == 0) / len(Y_test))
+
+# Compare baseline accuracy with model accuracy
+print("Baseline Accuracy:", baseline_accuracy)
+print("Model Test Accuracy:", test_data_accuracy)
+Baseline Accuracy: 0.5
+Model Test Accuracy: 0.77668125
+model's test accuracy (0.77668125) is significantly higher than the baseline accuracy (0.5).
+
+The baseline accuracy of 0.5 indicates that if you were to predict the majority class for all instances (which would be right half the time in a balanced dataset), you would achieve an accuracy of 50%. However, your model's test accuracy of 0.77668125 indicates that it performs significantly better than simply predicting the majority class every time. It suggests that your model is effectively capturing patterns in the data and making accurate predictions beyond what would be achieved by a simple baseline approach. This comparison highlights the effectiveness of your model in the context of your binary classification task, as it outperforms the baseline accuracy
+
+import pickle
+filename='trained_model.sav'
+pickle.dump(model,open(filename,'wb'))
+#using saved models for future predictions
+#loading the saved model
+loaded_model=pickle.load(open('trained_model.sav','rb'))
+X_new=X_test_tfidf[200]
+print(Y_test[200])
+pred=model.predict(X_new)
+print(pred)
+if (pred[0]==0):
+    print('negative tweet')
+else:
+    print('positive tweet')
+1
+[1]
+positive tweet
